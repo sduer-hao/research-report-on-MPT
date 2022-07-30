@@ -72,11 +72,13 @@ MPT树的操作
 
 i. 如果node是空节点，直接返回[pack_nibbles(with_terminator(key)), value]，即对key加上终止符，然后进行HP编码。
 
+![image](https://user-images.githubusercontent.com/80697546/181920746-04011c05-c955-4d74-8500-8f477b6bfb44.png)
 
 
 ii. 如果node是分支节点，如果key为空，则说明更新的是分支节点的value，直接将node[-1]设置成value就行了。如果key不为空，则递归更新以key[0]位置为根的子树，即沿着key往下找，即调用_update_and_delete_storage(self._decode_to_node(node[key[0]]),key[1:], value)。
 
 
+![image](https://user-images.githubusercontent.com/80697546/181920752-980652f1-5c32-4b17-b921-dc87562c9450.png)
 
 
 iii. 如果node是kv节点（叶子节点或者扩展节点），调用_update_kv_node(self, node, key, value)，见步骤iv
@@ -85,15 +87,18 @@ iv. curr_key是node的key，找到curr_key和key的最长公共前缀，长度�
 
 a)       如果remain_key==[]== remain_curr_key，即key和curr_key相等，那么如果node是叶子节点，直接返回[node[0], value]。如果node是扩展节点，那么递归更新node所链接的子节点，即调用_update_and_delete_storage(self._decode_to_node(node[1]),remain_key, value)
 
+![image](https://user-images.githubusercontent.com/80697546/181920795-ccbc9b25-8f3d-4817-aa79-e7464819113a.png)
 
 
 b)      如果remain_curr_key == []，即curr_key是key的一部分。如果node是扩展节点，递归更新node所链接的子节点，即调用_update_and_delete_storage(self._decode_to_node(node[1]),remain_key, value)；如果node是叶子节点，那么创建一个分支节点，分支节点的value是当前node的value，分支节点的remain_key[0]位置指向一个叶子节点，这个叶子节点是[pack_nibbles(with_terminator(remain_key[1:])),value]
 
+![image](https://user-images.githubusercontent.com/80697546/181920802-769e5afc-2d97-46f6-b0bf-5ff927ec0875.png)
 
 
 c)       否则，创建一个分支节点。如果curr_key只剩下了一个字符，并且node是扩展节点，那么这个分支节点的remain_curr_key[0]的分支是node[1]，即存储node的value。否则，这个分支节点的remain_curr_key[0]的分支指向一个新的节点，这个新的节点的key是remain_curr_key[1:]的HP编码，value是node[1]。如果remain_key为空，那么新的分支节点的value是要参数中的value，否则，新的分支节点的remain_key[0]的分支指向一个新的节点，这个新的节点是[pack_nibbles(with_terminator(remain_key[1:])),value]
 
 d)      如果key和curr_key有公共部分，为公共部分创建一个扩展节点，此扩展节点的value链接到上面步骤创建的新节点，返回这个扩展节点；否则直接返回上面步骤创建的新节点
+![image](https://user-images.githubusercontent.com/80697546/181920808-bdb06b0a-a19a-4cf0-97af-0b654e796d68.png)
 
 
 v. 删除老的node，返回新的node
