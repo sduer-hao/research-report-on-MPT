@@ -48,3 +48,69 @@ t !=0时 "0010"+"0005 1011 0003 1110 1101"->"00100005 10110003 11101101"->"0x205
 最低位表示奇偶性，第二低位编码终止符状态。
 最低位为0的时候表示偶数位置，反之奇数。
 第二低位为1的时候表示结束，反之不结束。
+
+MPT树的操作
+下面从MPT树的更新，删除和查找过程来说明MPT树的操作。
+
+1 更新
+
+函数_update_and_delete_storage(self, node, key, value)
+
+i. 如果node是空节点，直接返回[pack_nibbles(with_terminator(key)), value]，即对key加上终止符，然后进行HP编码。
+
+
+
+ii. 如果node是分支节点，如果key为空，则说明更新的是分支节点的value，直接将node[-1]设置成value就行了。如果key不为空，则递归更新以key[0]位置为根的子树，即沿着key往下找，即调用_update_and_delete_storage(self._decode_to_node(node[key[0]]),key[1:], value)。
+
+
+
+
+iii. 如果node是kv节点（叶子节点或者扩展节点），调用_update_kv_node(self, node, key, value)，见步骤iv
+
+iv. curr_key是node的key，找到curr_key和key的最长公共前缀，长度为prefix_length。Key剩余的部分为remain_key，curr_key剩余的部分为remain_curr_key。
+
+a)       如果remain_key==[]== remain_curr_key，即key和curr_key相等，那么如果node是叶子节点，直接返回[node[0], value]。如果node是扩展节点，那么递归更新node所链接的子节点，即调用_update_and_delete_storage(self._decode_to_node(node[1]),remain_key, value)
+
+
+
+b)      如果remain_curr_key == []，即curr_key是key的一部分。如果node是扩展节点，递归更新node所链接的子节点，即调用_update_and_delete_storage(self._decode_to_node(node[1]),remain_key, value)；如果node是叶子节点，那么创建一个分支节点，分支节点的value是当前node的value，分支节点的remain_key[0]位置指向一个叶子节点，这个叶子节点是[pack_nibbles(with_terminator(remain_key[1:])),value]
+
+
+
+c)       否则，创建一个分支节点。如果curr_key只剩下了一个字符，并且node是扩展节点，那么这个分支节点的remain_curr_key[0]的分支是node[1]，即存储node的value。否则，这个分支节点的remain_curr_key[0]的分支指向一个新的节点，这个新的节点的key是remain_curr_key[1:]的HP编码，value是node[1]。如果remain_key为空，那么新的分支节点的value是要参数中的value，否则，新的分支节点的remain_key[0]的分支指向一个新的节点，这个新的节点是[pack_nibbles(with_terminator(remain_key[1:])),value]
+
+d)      如果key和curr_key有公共部分，为公共部分创建一个扩展节点，此扩展节点的value链接到上面步骤创建的新节点，返回这个扩展节点；否则直接返回上面步骤创建的新节点
+
+
+v. 删除老的node，返回新的node
+
+ 
+
+l  删除
+
+删除的过程和更新的过程类似，而且很简单，函数名：_delete_and_delete_storage(self, key)
+
+i. 如果node为空节点，直接返回空节点
+
+ii. 如果node为分支节点。如果key为空，表示删除分支节点的值，直接另node[-1]=‘’, 返回node的正规化的结果。如果key不为空，递归查找node的子节点，然后删除对应的value，即调用self._delete_and_delete_storage(self._decode_to_node(node[key[0]]),key[1:])。返回新节点
+
+iii. 如果node为kv节点，curr_key是当前node的key。
+
+a) 如果key不是以curr_key开头，说明key不在node为根的子树内，直接返回node。
+
+b) 否则，如果node是叶节点，返回BLANK_NODE if key == curr_key else node。
+
+c)如果node是扩展节点，递归删除node的子节点，即调用_delete_and_delete_storage(self._decode_to_node(node[1]),key[len(curr_key):])。如果新的子节点和node[-1]相等直接返回node。否则，如果新的子节点是kv节点，将curr_key与新子节点的可以串联当做key，新子节点的value当做vlaue，返回。如果新子节点是branch节点，node的value指向这个新子节点，返回。
+
+l  查找
+
+查找操作更简单，是一个递归查找的过程函数名为：_get(self, node, key)
+
+i. 如果node是空节点，返回空节点
+
+ii. 如果node是分支节点，如果key为空，返回分支节点的value；否则递归查找node的子节点，即调用_get(self._decode_to_node(node[key[0]]), key[1:])
+
+iii. 如果node是叶子节点，返回node[1] if key == curr_key else ‘’
+
+iv. 如果node是扩展节点，如果key以curr_key开头，递归查找node的子节点，即调用_get(self._decode_to_node(node[1]),key[len(curr_key):])；否则，说明key不在以node为根的子树里，返回空
+
